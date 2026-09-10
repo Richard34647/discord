@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NexusGaming Bot Dashboard</title>
+    <style>
+        :root {
+            --bg-color: #202225;
+            --sidebar-color: #2f3136;
+            --card-color: #36393f;
+            --accent-color: #5865f2;
+            --text-color: #dcddde;
+            --text-muted: #72767d;
+            --success: #3ba55d;
+            --danger: #ed4245;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            display: flex;
+            height: 100vh;
+        }
+        .sidebar {
+            width: 260px;
+            background-color: var(--sidebar-color);
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .sidebar h2 {
+            color: #fff;
+            margin-bottom: 30px;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .main-content {
+            flex: 1;
+            padding: 40px;
+            overflow-y: auto;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        .card {
+            background-color: var(--card-color);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .card h3 {
+            margin: 0 0 10px 0;
+            color: var(--text-muted);
+            font-size: 14px;
+            text-transform: uppercase;
+        }
+        .card .metric {
+            font-size: 28px;
+            font-weight: bold;
+            color: #fff;
+        }
+        .endpoint-panel {
+            background-color: var(--card-color);
+            padding: 25px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+        .endpoint-panel h3 {
+            margin-top: 0;
+            color: #fff;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-muted);
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--bg-color);
+            border: 1px solid #000;
+            border-radius: 4px;
+            color: #fff;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: var(--accent-color);
+            color: #fff;
+            border: none;
+            padding: 12px 24px;
+            font-size: 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background-color: #4752c4;
+        }
+        .log-container {
+            background-color: #000;
+            color: #0f0;
+            font-family: 'Courier New', Courier, monospace;
+            padding: 15px;
+            border-radius: 4px;
+            height: 180px;
+            overflow-y: auto;
+            font-size: 13px;
+        }
+        .log-entry {
+            margin-bottom: 5px;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status-online { background-color: var(--success); color: #fff; }
+        .status-offline { background-color: var(--danger); color: #fff; }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <h2>🎮 NexusGaming</h2>
+        <p style="color: var(--text-muted);">Bot Management Suite</p>
+    </div>
+
+    <div class="main-content">
+        <h1>Dashboard Overview</h1>
+        
+        <!-- Metrics Grid -->
+        <div class="grid">
+            <div class="card">
+                <h3>Bot Status</h3>
+                <div id="bot-status" class="metric"><span class="status-badge status-offline">Offline</span></div>
+            </div>
+            <div class="card">
+                <h3>Active Servers</h3>
+                <div id="server-count" class="metric">0</div>
+            </div>
+            <div class="card">
+                <h3>Total Interactions</h3>
+                <div id="interaction-count" class="metric">0</div>
+            </div>
+        </div>
+
+        <!-- Interactions Endpoint Panel -->
+        <div class="endpoint-panel">
+            <h3>Interactions Endpoint Configuration</h3>
+            <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 20px;">
+                Monitor requests coming directly from your Discord webhook gateway handler.
+            </p>
+            
+            <div class="input-group">
+                <label>Active Endpoint URL</label>
+                <input type="text" id="endpoint-url-display" readonly value="Loading active endpoint route...">
+            </div>
+
+            <button id="refresh-btn" onclick="fetchLiveMetrics()">Force Refresh Metrics</button>
+        </div>
+
+        <!-- System Event Logs -->
+        <h3>Live Live Webhook Streams</h3>
+        <div class="log-container" id="log-box">
+            <div class="log-entry">[System] Dashboard initialized. Awaiting API streaming connection...</div>
+        </div>
+    </div>
+
+    <script>
+        const logBox = document.getElementById('log-box');
+
+        // Helper to append logs cleanly
+        function addLog(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+            logEntry.innerText = `[${timestamp}] ${message}`;
+            logBox.appendChild(logEntry);
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        // Fetch live production metrics directly from server.js API endpoints
+        async function fetchLiveMetrics() {
+            try {
+                // Queries the API routes hosted natively on your node server
+                const response = await fetch('/api/stats');
+                if (!response.ok) throw new Error(`HTTP Error Status: ${response.status}`);
+                
+                const data = await response.json();
+
+                // Inject live data variables straight into DOM containers
+                document.getElementById('server-count').innerText = data.servers.toLocaleString();
+                document.getElementById('interaction-count').innerText = data.interactions.toLocaleString();
+                document.getElementById('endpoint-url-display').value = data.endpointUrl;
+
+                const statusBox = document.getElementById('bot-status');
+                if (data.status === 'Online') {
+                    statusBox.innerHTML = '<span class="status-badge status-online">Online</span>';
+                } else {
+                    statusBox.innerHTML = '<span class="status-badge status-offline">Offline</span>';
+                }
+
+                addLog("Metrics actively synced from server.js successfully.");
+            } catch (error) {
+                console.error("Failed fetching live api statistics:", error);
+                addLog(`Connection Error: Unable to reach backend server.js api.`);
+                document.getElementById('bot-status').innerHTML = '<span class="status-badge status-offline">Disconnected</span>';
+            }
+        }
+
+        // Keep the UI dashboard fresh by polling the server every 4 seconds
+        setInterval(fetchLiveMetrics, 4000);
+
+        // Initial launch kickstart
+        window.onload = () => {
+            fetchLiveMetrics();
+            addLog("Automatic polling sequence engaged (4000ms intervals).");
+        };
+    </script>
+</body>
+</html>
